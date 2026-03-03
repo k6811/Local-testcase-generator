@@ -148,13 +148,30 @@
                 navigator.clipboard.writeText(content).then(() => showToast('✅ Copied to clipboard!'));
             });
 
+            const downloadBtn = makeActionBtn('💾 Download JSON', () => {
+                const testCases = parseTestCasesToJSON(content);
+                const blob = new Blob([JSON.stringify(testCases, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `test-cases-${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
             actions.appendChild(copyBtn);
+            actions.appendChild(downloadBtn);
             msgContent.appendChild(actions);
         }
 
         row.appendChild(avatar);
         row.appendChild(msgContent);
         messagesArea.appendChild(row);
+
+        // Transform into table if AI
+        if (isAI) {
+            transformMarkdownToTable(bubble);
+        }
         scrollToBottom();
     }
 
@@ -209,5 +226,84 @@
         const el = document.createElement('div');
         el.appendChild(document.createTextNode(text));
         return el.innerHTML;
+    }
+
+    // ── Table Transformer ─────────────────────────────────
+    function transformMarkdownToTable(container) {
+        const markdown = container.innerText;
+        const testCases = parseTestCasesToJSON(markdown);
+
+        if (testCases.length > 0) {
+            container.innerHTML = `
+                <div class="result-label">Generated Test Cases:</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Title</th>
+                                <th>Steps</th>
+                                <th>Expected Result</th>
+                                <th>Priority</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${testCases.map(tc => `
+                                <tr>
+                                    <td class="tc-id">${tc.id}</td>
+                                    <td class="tc-title">${tc.title}</td>
+                                    <td class="tc-steps">${tc.steps.map(s => `<div>${s}</div>`).join('')}</td>
+                                    <td class="tc-expected">${tc.expected}</td>
+                                    <td class="tc-priority" data-priority="${tc.priority.toLowerCase()}">${tc.priority}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    }
+
+    function parseTestCasesToJSON(text) {
+        const cases = [];
+        const blocks = text.split(/Test Case ID: /i);
+
+        blocks.forEach(block => {
+            if (!block.trim()) return;
+
+            const tc = {
+                id: '',
+                title: '',
+                steps: [],
+                expected: '',
+                priority: 'Medium'
+            };
+
+            const lines = block.split('\n');
+            tc.id = lines[0].trim();
+
+            const titleMatch = block.match(/Title: (.*?)\n/i);
+            if (titleMatch) tc.title = titleMatch[1].trim();
+
+            const priorityMatch = block.match(/Priority: (.*?)\n/i);
+            if (priorityMatch) tc.priority = priorityMatch[1].trim();
+
+            const stepsMatch = block.match(/Test Steps:\n([\s\S]*?)(?=\nTest Cases|Expected Result:|\n\n|$)/i);
+            if (stepsMatch) {
+                tc.steps = stepsMatch[1].trim().split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim());
+            }
+
+            const expectedMatch = block.match(/Expected Result:\n([\s\S]*?)(?=\n\n|$)/i);
+            if (expectedMatch) tc.expected = expectedMatch[1].trim();
+            else {
+                // Try alternate "Verify that..." pattern if structured label missing
+                const verifyMatch = block.match(/Verify that (.*?)\./i);
+                if (verifyMatch) tc.expected = 'Verify that ' + verifyMatch[1].trim();
+            }
+
+            if (tc.title) cases.push(tc);
+        });
+
+        return cases;
     }
 })();

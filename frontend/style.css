@@ -841,3 +841,93 @@ textarea::placeholder {
     background: var(--border);
     border-radius: 999px;
 }
+
+/* ── Results Table ─────────────────────────────────────── */
+.result-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+.table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.table-container th {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.table-container td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.table-container tr:last-child td {
+    border-bottom: none;
+}
+
+.tc-id {
+    font-family: var(--font-mono);
+    color: var(--accent-bright);
+    white-space: nowrap;
+}
+
+.tc-title {
+    font-weight: 500;
+    color: var(--text-primary);
+    min-width: 140px;
+}
+
+.tc-steps {
+    min-width: 200px;
+}
+
+.tc-steps div {
+    margin-bottom: 4px;
+}
+
+.tc-expected {
+    min-width: 180px;
+}
+
+.tc-priority {
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.tc-priority[data-priority="high"] {
+    color: #ef4444;
+}
+
+.tc-priority[data-priority="medium"] {
+    color: #f59e0b;
+}
+
+.tc-priority[data-priority="low"] {
+    color: #10b981;
+}
+
+/* Ensure AI bubble doesn't constrain table too much */
+.msg-bubble.ai {
+    max-width: 95%;
+}
