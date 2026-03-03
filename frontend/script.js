@@ -170,7 +170,7 @@
 
         // Transform into table if AI
         if (isAI) {
-            transformMarkdownToTable(bubble);
+            transformMarkdownToTable(bubble, content);
         }
         scrollToBottom();
     }
@@ -229,8 +229,7 @@
     }
 
     // ── Table Transformer ─────────────────────────────────
-    function transformMarkdownToTable(container) {
-        const markdown = container.innerText;
+    function transformMarkdownToTable(container, markdown) {
         const testCases = parseTestCasesToJSON(markdown);
 
         if (testCases.length > 0) {
@@ -250,11 +249,11 @@
                         <tbody>
                             ${testCases.map(tc => `
                                 <tr>
-                                    <td class="tc-id">${tc.id}</td>
+                                    <td class="tc-id">${tc.id || 'N/A'}</td>
                                     <td class="tc-title">${tc.title}</td>
-                                    <td class="tc-steps">${tc.steps.map(s => `<div>${s}</div>`).join('')}</td>
-                                    <td class="tc-expected">${tc.expected}</td>
-                                    <td class="tc-priority" data-priority="${tc.priority.toLowerCase()}">${tc.priority}</td>
+                                    <td class="tc-steps">${tc.steps.length ? tc.steps.map(s => `<div>• ${s}</div>`).join('') : '<em>No steps provided</em>'}</td>
+                                    <td class="tc-expected">${tc.expected || '<em>No expected result</em>'}</td>
+                                    <td class="tc-priority" data-priority="${(tc.priority || 'medium').toLowerCase()}">${tc.priority || 'Medium'}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -265,11 +264,14 @@
     }
 
     function parseTestCasesToJSON(text) {
+        if (!text) return [];
+
         const cases = [];
-        const blocks = text.split(/Test Case ID: /i);
+        // Split by "Test Case ID:" or "### Test Case" but keep the delimiter
+        const blocks = text.split(/(?=Test Case ID:|### Test Case)/i);
 
         blocks.forEach(block => {
-            if (!block.trim()) return;
+            if (!block.trim() || !block.toLowerCase().includes('title:')) return;
 
             const tc = {
                 id: '',
@@ -279,26 +281,41 @@
                 priority: 'Medium'
             };
 
-            const lines = block.split('\n');
-            tc.id = lines[0].trim();
+            // ID extraction
+            const idMatch = block.match(/(?:Test Case ID:|### Test Case)\s*(\w+(?:-\d+)?)/i);
+            tc.id = idMatch ? idMatch[1].trim() : '';
 
-            const titleMatch = block.match(/Title: (.*?)\n/i);
-            if (titleMatch) tc.title = titleMatch[1].trim();
-
-            const priorityMatch = block.match(/Priority: (.*?)\n/i);
-            if (priorityMatch) tc.priority = priorityMatch[1].trim();
-
-            const stepsMatch = block.match(/Test Steps:\n([\s\S]*?)(?=\nTest Cases|Expected Result:|\n\n|$)/i);
-            if (stepsMatch) {
-                tc.steps = stepsMatch[1].trim().split('\n').map(s => s.replace(/^\d+\.\s*/, '').trim());
+            // Title and Priority often combined on one line in LLM output
+            const titleLineMatch = block.match(/Title:\s*(.*)/i);
+            if (titleLineMatch) {
+                const fullTitleLine = titleLineMatch[1].trim();
+                // If Priority is on the same line, extract it and clean the title
+                const pMatch = fullTitleLine.match(/(.*)Priority:\s*(\w+)/i);
+                if (pMatch) {
+                    tc.title = pMatch[1].trim().replace(/\s+Type:\s*\w+$/i, '');
+                    tc.priority = pMatch[2].trim();
+                } else {
+                    tc.title = fullTitleLine.replace(/\s+Type:\s*\w+$/i, '');
+                }
             }
 
-            const expectedMatch = block.match(/Expected Result:\n([\s\S]*?)(?=\n\n|$)/i);
-            if (expectedMatch) tc.expected = expectedMatch[1].trim();
-            else {
-                // Try alternate "Verify that..." pattern if structured label missing
-                const verifyMatch = block.match(/Verify that (.*?)\./i);
-                if (verifyMatch) tc.expected = 'Verify that ' + verifyMatch[1].trim();
+            // Steps extraction
+            const stepsMatch = block.match(/Test Steps:?\s*\n?([\s\S]*?)(?=Expected Result:|$)/i);
+            if (stepsMatch) {
+                tc.steps = stepsMatch[1].trim()
+                    .split('\n')
+                    .map(s => s.replace(/^[-\d.*]+\s*/, '').trim())
+                    .filter(s => s.length > 0);
+            }
+
+            // Expected Result extraction
+            const expectedMatch = block.match(/Expected Result:?\s*\n?([\s\S]*?)(?=\n\n|\nNotes?:|$)/i);
+            if (expectedMatch) {
+                tc.expected = expectedMatch[1].trim().replace(/^[*-]\s*/, '');
+            } else {
+                // Fallback: search for "Verify that..." pattern
+                const verifyMatch = block.match(/Verify elements? (.*?)\./i) || block.match(/Verify that (.*?)\./i);
+                if (verifyMatch) tc.expected = 'Verify ' + verifyMatch[1].trim();
             }
 
             if (tc.title) cases.push(tc);
