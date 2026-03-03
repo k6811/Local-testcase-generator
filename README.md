@@ -2,6 +2,18 @@
 
 A local-first testcase generator powered by Ollama (`llama3.2`) and FastAPI.
 
+## Architecture
+```mermaid
+graph TD
+    A[User Chat UI] -->|User Input| B(FastAPI Backend)
+    B -->|Prompt Wrapping| C{Local Ollama}
+    C -->|llama3.2 Engine| D[Generated Markdown]
+    D -->|API Response| B
+    B -->|Cleaned JSON| A
+    A -->|Regex Parser| E[Structured Table UI]
+    E -->|Download| F[JSON File]
+```
+
 ## Features
 - **Local LLM**: Uses Ollama for data privacy and local execution.
 - **FastAPI Backend**: Robust API for interacting with the LLM.
